@@ -6,36 +6,36 @@ This document describes the internal architecture of the Snap compiler.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         Source Code                              │
-│                       (main.sp files)                            │
+│                       Source Code                               │
+│                     (main.sp files)                             │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                          Lexer                                   │
-│                    (lexer.rs)                                    │
-│              Source Text → Token Stream                          │
+│                           Lexer                                 │
+│                         (lexer.rs)                              │
+│                 Source Text → Token Stream                      │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                          Parser                                  │
-│                    (parser.rs)                                   │
-│              Token Stream → AST                                  │
+│                          Parser                                 │
+│                        (parser.rs)                              │
+│                    Token Stream → AST                           │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                      Code Generator                              │
-│                    (codegen.rs)                                  │
-│              AST → Scratch Project                               │
+│                      Code Generator                             │
+│                       (codegen.rs)                              │
+│                   AST → Scratch Project                         │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                        Packager                                  │
-│                    (packager.rs)                                 │
-│              Scratch Project → .sb3 File                         │
+│                          Packager                               │
+│                       (packager.rs)                             │
+│                 Scratch Project → .sb3 File                     │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -62,11 +62,13 @@ The lexer (tokenizer) converts source text into a stream of tokens.
 ```
 
 **Key types:**
+
 - `TokenKind` - Enum of all token types
 - `Token` - Token with position info
 - `Lexer` - Stateful tokenizer
 
 **Key functions:**
+
 - `tokenize(source) -> Vec<Token>` - Main entry point
 - `next_token()` - Get next token
 - `skip_whitespace()` - Skip spaces and comments
@@ -94,16 +96,19 @@ Program {
 ```
 
 **Key types:**
+
 - `Parser` - Stateful parser with token stream
 - `Program` - Root AST node
 
 **Key functions:**
+
 - `parse(tokens) -> Program` - Main entry point
 - `parse_sprite()` - Parse sprite definition
 - `parse_statement()` - Parse a statement
 - `parse_expression()` - Parse an expression
 
 **Parsing strategy:**
+
 - Recursive descent parser
 - Pratt parsing for expressions (operator precedence)
 - Lookahead for disambiguation
@@ -150,10 +155,12 @@ pub enum Expression {
 Converts the AST into Scratch's JSON block format.
 
 **Key types:**
+
 - `CodeGenerator` - Stateful generator with ID counters
 - Block/variable/broadcast ID maps
 
 **Key functions:**
+
 - `generate(config, program) -> ScratchProject` - Main entry point
 - `generate_sprite()` - Generate a target
 - `generate_statement()` - Generate blocks for a statement
@@ -210,11 +217,13 @@ pub struct Block {
 Creates the final .sb3 file (ZIP archive).
 
 **Contents of .sb3:**
+
 - `project.json` - Serialized ScratchProject
 - `*.svg` - Costume/backdrop images
 - `*.wav` - Sound files
 
 **Key functions:**
+
 - `package(project, output_path)` - Create .sb3 file
 
 ## Data Flow Example
@@ -311,13 +320,13 @@ Cat.sb3 (ZIP)
 
 ### Input Types
 
-| Type | Code | Example |
-|------|------|--------|
-| Number | 4 | `[1, [4, "10"]]` |
-| Positive Number | 5 | `[1, [5, "10"]]` |
-| String | 10 | `[1, [10, "hello"]]` |
-| Broadcast | 11 | `[1, [11, "message", "id"]]` |
-| Variable | 12 | `[3, [12, "score", "id"], [4, "0"]]` |
+| Type            | Code | Example                              |
+| --------------- | ---- | ------------------------------------ |
+| Number          | 4    | `[1, [4, "10"]]`                     |
+| Positive Number | 5    | `[1, [5, "10"]]`                     |
+| String          | 10   | `[1, [10, "hello"]]`                 |
+| Broadcast       | 11   | `[1, [11, "message", "id"]]`         |
+| Variable        | 12   | `[3, [12, "score", "id"], [4, "0"]]` |
 
 ### Block Reference
 
