@@ -1,0 +1,276 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.1.0)'
+        required: true
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+  BINARY_NAME: snap
+
+jobs:
+  # Build binaries for all platforms
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            archive: tar.gz
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            archive: tar.gz
+            cross: true
+
+          # macOS
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            archive: tar.gz
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            archive: tar.gz
+
+          # Windows
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            archive: zip
+          - target: aarch64-pc-windows-msvc
+            os: windows-latest
+            archive: zip
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Add target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Install cross-compilation tools
+        if: matrix.cross
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Prepare artifacts (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cd target/${{ matrix.target }}/release
+          strip ${{ env.BINARY_NAME }} || true
+          tar -czvf ../../../${{ env.BINARY_NAME }}-${{ matrix.target }}.tar.gz ${{ env.BINARY_NAME }}
+
+      - name: Prepare artifacts (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          cd target/${{ matrix.target }}/release
+          Compress-Archive -Path ${{ env.BINARY_NAME }}.exe -DestinationPath ../../../${{ env.BINARY_NAME }}-${{ matrix.target }}.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BINARY_NAME }}-${{ matrix.target }}
+          path: ${{ env.BINARY_NAME }}-${{ matrix.target }}.${{ matrix.archive }}
+          retention-days: 1
+
+  # Create GitHub Release
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+            echo "tag=v${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release
+          find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" \) -exec mv {} release/ \;
+          ls -la release/
+
+      - name: Generate checksums
+        run: |
+          cd release
+          sha256sum * > checksums-sha256.txt
+          cat checksums-sha256.txt
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          cat << 'EOF' > release_notes.md
+          ## Snap ${{ steps.version.outputs.version }}
+
+          A programming language that compiles to Scratch (.sb3) projects.
+
+          ### Installation
+
+          1. Download the appropriate archive for your platform
+          2. Extract the binary
+          3. Add to your PATH or move to a directory in your PATH
+
+          #### Quick install (Unix)
+
+          ```bash
+          # Linux x86_64
+          curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/snap-x86_64-unknown-linux-gnu.tar.gz | tar xz
+          sudo mv snap /usr/local/bin/
+
+          # macOS Apple Silicon
+          curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/snap-aarch64-apple-darwin.tar.gz | tar xz
+          sudo mv snap /usr/local/bin/
+
+          # macOS Intel
+          curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/snap-x86_64-apple-darwin.tar.gz | tar xz
+          sudo mv snap /usr/local/bin/
+          ```
+
+          ### Platforms
+
+          | Platform | Architecture | File |
+          |----------|--------------|------|
+          | Linux | x86_64 | `snap-x86_64-unknown-linux-gnu.tar.gz` |
+          | Linux | ARM64 | `snap-aarch64-unknown-linux-gnu.tar.gz` |
+          | macOS | Intel | `snap-x86_64-apple-darwin.tar.gz` |
+          | macOS | Apple Silicon | `snap-aarch64-apple-darwin.tar.gz` |
+          | Windows | x86_64 | `snap-x86_64-pc-windows-msvc.zip` |
+          | Windows | ARM64 | `snap-aarch64-pc-windows-msvc.zip` |
+
+          ### Verify Downloads
+
+          Verify your download with the checksums in `checksums-sha256.txt`:
+
+          ```bash
+          sha256sum -c checksums-sha256.txt
+          ```
+
+          ### Getting Started
+
+          ```bash
+          # Create a new project
+          snap new my_project
+          cd my_project
+
+          # Build
+          snap build
+
+          # Check for help
+          snap --help
+          ```
+
+          See the [documentation](https://${{ github.repository_owner }}.github.io/snap/) for more information.
+          EOF
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Snap ${{ steps.version.outputs.version }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+          files: |
+            release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Update Homebrew tap (optional, for macOS users)
+  homebrew:
+    name: Update Homebrew
+    needs: release
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.ref, '-') }} # Skip for pre-releases
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate Homebrew formula
+        run: |
+          cat << EOF > snap.rb
+          class Snap < Formula
+            desc "A programming language that compiles to Scratch (.sb3) projects"
+            homepage "https://github.com/${{ github.repository }}"
+            version "${{ steps.version.outputs.version }}"
+            license "MIT"
+
+            on_macos do
+              if Hardware::CPU.arm?
+                url "https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/snap-aarch64-apple-darwin.tar.gz"
+              else
+                url "https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/snap-x86_64-apple-darwin.tar.gz"
+              end
+            end
+
+            on_linux do
+              if Hardware::CPU.arm?
+                url "https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/snap-aarch64-unknown-linux-gnu.tar.gz"
+              else
+                url "https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/snap-x86_64-unknown-linux-gnu.tar.gz"
+              end
+            end
+
+            def install
+              bin.install "snap"
+            end
+
+            test do
+              system "#{bin}/snap", "--version"
+            end
+          end
+          EOF
+
+          echo "Generated Homebrew formula:"
+          cat snap.rb
+
+      - name: Upload formula artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: homebrew-formula
+          path: snap.rb
+          retention-days: 90

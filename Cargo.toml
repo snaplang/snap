@@ -1,0 +1,19 @@
+[package]
+name = "snap"
+version = "0.1.0"
+edition = "2021"
+description = "A programming language that compiles to Scratch (.sb3) projects"
+authors = ["Snap Contributors"]
+license = "MIT"
+readme = "README.md"
+keywords = ["scratch", "compiler", "programming-language"]
+categories = ["compilers", "development-tools"]
+
+[dependencies]
+toml = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+zip = "0.6"
+uuid = { version = "1.0", features = ["v4"] }
+clap = { version = "4.4", features = ["derive"] }
+colored = "2.0"
