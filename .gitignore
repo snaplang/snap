@@ -1,1 +1,23 @@
+# Build output
 /target
+
+# Generated Scratch files
+*.sb3
+
+# Test projects
+/test_project
+/my_test_project
+/dev_test
+
+# Documentation build
+/docs/book
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
