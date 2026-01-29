@@ -368,6 +368,31 @@ pub struct Monitor {
     pub is_discrete: bool,
 }
 
+impl Monitor {
+    /// Create a variable monitor
+    pub fn variable(id: &str, name: &str, value: serde_json::Value, x: f64, y: f64) -> Self {
+        let mut params = HashMap::new();
+        params.insert("VARIABLE".to_string(), name.to_string());
+
+        Monitor {
+            id: id.to_string(),
+            mode: "default".to_string(),
+            opcode: "data_variable".to_string(),
+            params,
+            sprite_name: None,
+            value,
+            width: 0.0,
+            height: 0.0,
+            x,
+            y,
+            visible: false,
+            slider_min: 0.0,
+            slider_max: 100.0,
+            is_discrete: true,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Meta {
     pub semver: String,

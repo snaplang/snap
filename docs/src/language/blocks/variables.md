@@ -13,14 +13,38 @@ let game_over: bool = false;
 let speed: float = 2.5;
 ```
 
+### Variable Monitors
+
+By default, variable monitors (the on-screen displays) are **hidden**. You can configure a variable's monitor to be visible and set its position on the screen:
+
+```snap
+let score: int = 0 monitor(x: 10, y: 20, visible: true);
+let lives: int = 3 monitor(x: 10, y: 60, visible: true);
+let speed: float = 2.5;  // Monitor hidden by default
+```
+
+Monitor configuration is optional. You can specify:
+
+- `x`: X position on screen (default: 5.0)
+- `y`: Y position on screen (default: auto-incremented from 5.0)
+- `visible`: Whether the monitor is visible (default: `false`)
+
+All monitor parameters are optional - you can specify only the ones you need:
+
+```snap
+let score: int = 0 monitor(visible: true);  // Visible at default position
+let lives: int = 3 monitor(x: 100, y: 200); // Hidden at custom position
+let speed: float = 2.5 monitor(visible: true, x: 200); // Visible at x=200, auto y
+```
+
 ### Variable Types
 
-| Type | Description | Default Value | Example Values |
-|------|-------------|---------------|----------------|
-| `int` | Integer numbers | `0` | `0`, `42`, `-10` |
-| `float` | Decimal numbers | `0.0` | `3.14`, `-0.5`, `2.0` |
-| `bool` | Boolean values | `false` | `true`, `false` |
-| `string` | Text strings | `""` | `"Hello"`, `"Player 1"` |
+| Type     | Description     | Default Value | Example Values          |
+| -------- | --------------- | ------------- | ----------------------- |
+| `int`    | Integer numbers | `0`           | `0`, `42`, `-10`        |
+| `float`  | Decimal numbers | `0.0`         | `3.14`, `-0.5`, `2.0`   |
+| `bool`   | Boolean values  | `false`       | `true`, `false`         |
+| `string` | Text strings    | `""`          | `"Hello"`, `"Player 1"` |
 
 ## Setting Variables
 
@@ -123,15 +147,15 @@ new Sprite("ScoreManager") {
         on GreenFlag {
             set score = 0;
         }
-        
+
         on Broadcast("add_points") {
             change score by 10;
-            
+
             if score > high_score {
                 set high_score = score;
             }
         }
-        
+
         on GreenFlag {
             control::Forever {
                 looks::Say(operators::Join("Score: ", score));
@@ -151,10 +175,10 @@ new Sprite("Player") {
         on GreenFlag {
             set lives = 3;
         }
-        
+
         on Broadcast("player_hit") {
             change lives by -1;
-            
+
             if lives <= 0 {
                 events::Broadcast("game_over");
             } else {
@@ -175,7 +199,7 @@ new Sprite("Player") {
     implements Code {
         on GreenFlag {
             set speed = 5.0;
-            
+
             control::Forever {
                 if sensing::KeyPressed("right arrow") {
                     motion::ChangeX(speed);
@@ -185,11 +209,11 @@ new Sprite("Player") {
                 }
             }
         }
-        
+
         on KeyPressed("up arrow") {
             change speed by 1.0;
         }
-        
+
         on KeyPressed("down arrow") {
             change speed by -1.0;
         }
@@ -211,14 +235,14 @@ new Stage {
             set game_over = false;
             set paused = false;
         }
-        
+
         on KeyPressed("space") {
             if game_started == false {
                 set game_started = true;
                 events::Broadcast("start_game");
             }
         }
-        
+
         on KeyPressed("p") {
             if paused {
                 set paused = false;
@@ -245,7 +269,7 @@ on GreenFlag {
 
 on Broadcast("enemy_defeated") {
     change enemies_remaining by -1;
-    
+
     if enemies_remaining == 0 {
         change level by 1;
         set enemies_remaining = level * 10;  // More enemies each level

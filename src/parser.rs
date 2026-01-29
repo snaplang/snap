@@ -56,6 +56,7 @@ impl Parser {
 
     pub fn parse(&mut self) -> Result<Program, String> {
         let mut imports = Vec::new();
+        let mut extensions = Vec::new();
         let mut globals = Vec::new();
         let mut stage = None;
         let mut sprites = Vec::new();
@@ -63,6 +64,19 @@ impl Parser {
         while !self.check(&TokenKind::Eof) {
             match self.current_kind() {
                 TokenKind::Use => {
+                    // Check if it's "use pen" or a file import
+                    let next_pos = self.pos + 1;
+                    if next_pos < self.tokens.len() {
+                        if let TokenKind::Identifier(ref ident) = &self.tokens[next_pos].kind {
+                            if ident == "pen" {
+                                self.advance(); // consume "use"
+                                self.advance(); // consume "pen"
+                                self.expect(TokenKind::Semicolon)?;
+                                extensions.push("pen".to_string());
+                                continue;
+                            }
+                        }
+                    }
                     imports.push(self.parse_import()?);
                 }
                 TokenKind::Let => {
@@ -102,6 +116,7 @@ impl Parser {
 
         Ok(Program {
             imports,
+            extensions,
             globals,
             stage,
             sprites,
@@ -122,13 +137,91 @@ impl Parser {
         let var_type = self.parse_var_type()?;
         self.expect(TokenKind::Equals)?;
         let initial_value = self.parse_expression()?;
+
+        // Parse optional monitor configuration
+        let (monitor_x, monitor_y, monitor_visible) =
+            if let TokenKind::Identifier(ref ident) = self.current_kind() {
+                if ident == "monitor" {
+                    self.advance(); // consume "monitor"
+                    self.parse_monitor_config()?
+                } else {
+                    (None, None, None)
+                }
+            } else {
+                (None, None, None)
+            };
+
         self.expect(TokenKind::Semicolon)?;
 
         Ok(GlobalVar {
             name,
             var_type,
             initial_value,
+            monitor_x,
+            monitor_y,
+            monitor_visible,
         })
+    }
+
+    fn parse_monitor_config(&mut self) -> Result<(Option<f64>, Option<f64>, Option<bool>), String> {
+        self.expect(TokenKind::LParen)?;
+
+        let mut x = None;
+        let mut y = None;
+        let mut visible = None;
+
+        while !self.check(&TokenKind::RParen) {
+            let key = self.parse_identifier()?;
+            self.expect(TokenKind::Colon)?;
+
+            match key.as_str() {
+                "x" => {
+                    let value = self.parse_number()?;
+                    x = Some(value);
+                }
+                "y" => {
+                    let value = self.parse_number()?;
+                    y = Some(value);
+                }
+                "visible" => {
+                    let value = match self.current_kind() {
+                        TokenKind::True => {
+                            self.advance();
+                            true
+                        }
+                        TokenKind::False => {
+                            self.advance();
+                            false
+                        }
+                        _ => {
+                            return Err(format!(
+                                "Expected true or false for visible, found {:?} at {}:{}",
+                                self.current_kind(),
+                                self.current().line,
+                                self.current().column
+                            ));
+                        }
+                    };
+                    visible = Some(value);
+                }
+                _ => {
+                    return Err(format!(
+                        "Unknown monitor config key: {} at {}:{}",
+                        key,
+                        self.current().line,
+                        self.current().column
+                    ));
+                }
+            }
+
+            if !self.check(&TokenKind::RParen) {
+                self.expect(TokenKind::Comma)?;
+            }
+        }
+
+        self.expect(TokenKind::RParen)?;
+
+        Ok((x, y, visible))
     }
 
     fn parse_var_type(&mut self) -> Result<VarType, String> {
@@ -166,12 +259,21 @@ impl Parser {
         let mut code = None;
 
         while !self.check(&TokenKind::RBrace) {
-            if self.check(&TokenKind::Identifier("backdrops".to_string())) {
-                self.advance();
-                self.expect(TokenKind::Colon)?;
-                backdrops = self.parse_string_array()?;
-                // Optional comma
-                self.match_token(&TokenKind::Comma);
+            if let TokenKind::Identifier(ref ident) = self.current_kind() {
+                if ident == "backdrops" {
+                    self.advance();
+                    self.expect(TokenKind::Colon)?;
+                    backdrops = self.parse_string_array()?;
+                    // Optional comma
+                    self.match_token(&TokenKind::Comma);
+                } else {
+                    return Err(format!(
+                        "Unexpected identifier in Stage: {} at {}:{}",
+                        ident,
+                        self.current().line,
+                        self.current().column
+                    ));
+                }
             } else if self.check(&TokenKind::Implements) {
                 code = Some(self.parse_implements_code()?);
             } else {
@@ -202,21 +304,30 @@ impl Parser {
         let mut code = None;
 
         while !self.check(&TokenKind::RBrace) {
-            if self.check(&TokenKind::Identifier("costumes".to_string())) {
-                self.advance();
-                self.expect(TokenKind::Colon)?;
-                costumes = self.parse_string_array()?;
-                self.match_token(&TokenKind::Comma);
-            } else if self.check(&TokenKind::Identifier("position".to_string())) {
-                self.advance();
-                self.expect(TokenKind::Colon)?;
-                position = Some(self.parse_position()?);
-                self.match_token(&TokenKind::Comma);
-            } else if self.check(&TokenKind::Identifier("size".to_string())) {
-                self.advance();
-                self.expect(TokenKind::Colon)?;
-                size = Some(self.parse_number()?);
-                self.match_token(&TokenKind::Comma);
+            if let TokenKind::Identifier(ref ident) = self.current_kind() {
+                if ident == "costumes" {
+                    self.advance();
+                    self.expect(TokenKind::Colon)?;
+                    costumes = self.parse_string_array()?;
+                    self.match_token(&TokenKind::Comma);
+                } else if ident == "position" {
+                    self.advance();
+                    self.expect(TokenKind::Colon)?;
+                    position = Some(self.parse_position()?);
+                    self.match_token(&TokenKind::Comma);
+                } else if ident == "size" {
+                    self.advance();
+                    self.expect(TokenKind::Colon)?;
+                    size = Some(self.parse_number()?);
+                    self.match_token(&TokenKind::Comma);
+                } else {
+                    return Err(format!(
+                        "Unexpected identifier in Sprite: {} at {}:{}",
+                        ident,
+                        self.current().line,
+                        self.current().column
+                    ));
+                }
             } else if self.check(&TokenKind::Implements) {
                 code = Some(self.parse_implements_code()?);
             } else {
@@ -311,6 +422,15 @@ impl Parser {
 
     fn parse_function(&mut self) -> Result<Function, String> {
         self.expect(TokenKind::Fn)?;
+
+        // Check for optional 'warp' keyword after 'fn'
+        let warp = if self.check(&TokenKind::Warp) {
+            self.advance();
+            true
+        } else {
+            false
+        };
+
         let name = self.parse_identifier()?;
         self.expect(TokenKind::LParen)?;
 
@@ -333,7 +453,12 @@ impl Parser {
         let body = self.parse_statements()?;
         self.expect(TokenKind::RBrace)?;
 
-        Ok(Function { name, params, body })
+        Ok(Function {
+            name,
+            params,
+            body,
+            warp,
+        })
     }
 
     fn parse_statements(&mut self) -> Result<Vec<Statement>, String> {
@@ -660,7 +785,7 @@ impl Parser {
     }
 
     fn parse_multiplicative_expr(&mut self) -> Result<Expression, String> {
-        let mut left = self.parse_unary_expr()?;
+        let mut left = self.parse_power_expr()?;
 
         loop {
             let op = match self.current_kind() {
@@ -672,10 +797,27 @@ impl Parser {
                 }
             };
             self.advance();
-            let right = self.parse_unary_expr()?;
+            let right = self.parse_power_expr()?;
             left = Expression::BinaryOp {
                 left: Box::new(left),
                 op,
+                right: Box::new(right),
+            };
+        }
+
+        Ok(left)
+    }
+
+    fn parse_power_expr(&mut self) -> Result<Expression, String> {
+        let mut left = self.parse_unary_expr()?;
+
+        // Power is right-associative: a^b^c = a^(b^c)
+        while self.check(&TokenKind::Caret) {
+            self.advance();
+            let right = self.parse_power_expr()?;
+            left = Expression::BinaryOp {
+                left: Box::new(left),
+                op: BinaryOperator::Power,
                 right: Box::new(right),
             };
         }
@@ -747,12 +889,97 @@ impl Parser {
                         // Check for units
                         if category == "units" {
                             self.expect(TokenKind::LParen)?;
-                            let value = self.parse_expression()?;
-                            self.expect(TokenKind::RParen)?;
-                            return Ok(Expression::UnitValue {
-                                unit: name,
-                                value: Box::new(value),
-                            });
+
+                            // Special handling for Rgb and Rgba which take multiple arguments
+                            if name == "Rgb" {
+                                let r = self.parse_expression()?;
+                                self.expect(TokenKind::Comma)?;
+                                let g = self.parse_expression()?;
+                                self.expect(TokenKind::Comma)?;
+                                let b = self.parse_expression()?;
+                                self.expect(TokenKind::RParen)?;
+
+                                // Calculate: r + g*256 + b*65536
+                                let g_times_256 = Expression::BinaryOp {
+                                    left: Box::new(g),
+                                    op: BinaryOperator::Mul,
+                                    right: Box::new(Expression::IntLiteral(256)),
+                                };
+                                let b_times_65536 = Expression::BinaryOp {
+                                    left: Box::new(b),
+                                    op: BinaryOperator::Mul,
+                                    right: Box::new(Expression::IntLiteral(65536)),
+                                };
+                                let gb_sum = Expression::BinaryOp {
+                                    left: Box::new(g_times_256),
+                                    op: BinaryOperator::Add,
+                                    right: Box::new(b_times_65536),
+                                };
+                                let rgb_sum = Expression::BinaryOp {
+                                    left: Box::new(r),
+                                    op: BinaryOperator::Add,
+                                    right: Box::new(gb_sum),
+                                };
+
+                                return Ok(Expression::UnitValue {
+                                    unit: name,
+                                    value: Box::new(rgb_sum),
+                                });
+                            } else if name == "Rgba" {
+                                let r = self.parse_expression()?;
+                                self.expect(TokenKind::Comma)?;
+                                let g = self.parse_expression()?;
+                                self.expect(TokenKind::Comma)?;
+                                let b = self.parse_expression()?;
+                                self.expect(TokenKind::Comma)?;
+                                let a = self.parse_expression()?;
+                                self.expect(TokenKind::RParen)?;
+
+                                // Calculate: r + g*256 + b*65536 + a*16777216
+                                let g_times_256 = Expression::BinaryOp {
+                                    left: Box::new(g),
+                                    op: BinaryOperator::Mul,
+                                    right: Box::new(Expression::IntLiteral(256)),
+                                };
+                                let b_times_65536 = Expression::BinaryOp {
+                                    left: Box::new(b),
+                                    op: BinaryOperator::Mul,
+                                    right: Box::new(Expression::IntLiteral(65536)),
+                                };
+                                let a_times_16777216 = Expression::BinaryOp {
+                                    left: Box::new(a),
+                                    op: BinaryOperator::Mul,
+                                    right: Box::new(Expression::IntLiteral(16777216)),
+                                };
+                                let gb_sum = Expression::BinaryOp {
+                                    left: Box::new(g_times_256),
+                                    op: BinaryOperator::Add,
+                                    right: Box::new(b_times_65536),
+                                };
+                                let rgb_sum = Expression::BinaryOp {
+                                    left: Box::new(r),
+                                    op: BinaryOperator::Add,
+                                    right: Box::new(gb_sum),
+                                };
+                                let rgba_sum = Expression::BinaryOp {
+                                    left: Box::new(rgb_sum),
+                                    op: BinaryOperator::Add,
+                                    right: Box::new(a_times_16777216),
+                                };
+
+                                return Ok(Expression::UnitValue {
+                                    unit: name,
+                                    value: Box::new(rgba_sum),
+                                });
+                            } else {
+                                // Regular unit with single argument
+                                let value = self.parse_expression()?;
+                                self.expect(TokenKind::RParen)?;
+                                return Ok(Expression::UnitValue {
+                                    unit: name,
+                                    value: Box::new(value),
+                                });
+                            }
                         }
 
                         // Reporter call with optional args

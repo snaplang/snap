@@ -66,15 +66,16 @@ control::Repeat(10) {
 
 ## Block Categories
 
-| Category | Description | Example |
-|----------|-------------|---------|
-| `motion` | Movement and position | `motion::Move(10)` |
-| `looks` | Appearance and speech | `looks::Say("Hi")` |
-| `sound` | Sound playback | `sound::Play("meow")` |
-| `events` | Broadcasts | `events::Broadcast("msg")` |
-| `control` | Flow control | `control::Wait(units::Sec(1))` |
-| `sensing` | Input and detection | `sensing::KeyPressed("space")` |
-| `operators` | Math and logic | `operators::Random(1, 10)` |
+| Category    | Description           | Example                                |
+| ----------- | --------------------- | -------------------------------------- |
+| `motion`    | Movement and position | `motion::Move(10)`                     |
+| `looks`     | Appearance and speech | `looks::Say("Hi")`                     |
+| `sound`     | Sound playback        | `sound::Play("meow")`                  |
+| `events`    | Broadcasts            | `events::Broadcast("msg")`             |
+| `control`   | Flow control          | `control::Wait(units::Sec(1))`         |
+| `sensing`   | Input and detection   | `sensing::KeyPressed("space")`         |
+| `operators` | Math and logic        | `operators::Random(1, 10)`             |
+| `pen`       | Drawing on stage      | `pen::PenDown()` (requires `use pen;`) |
 
 ## Quick Reference
 

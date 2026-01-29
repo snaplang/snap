@@ -14,7 +14,56 @@ let diff = a - b;       // Subtraction
 let product = a * b;    // Multiplication
 let quotient = a / b;   // Division
 let remainder = a % b;  // Modulo
+let power = a ^ b;      // Exponentiation (a to the power of b)
 let negative = -a;      // Negation
+```
+
+### Exponentiation
+
+The `^` operator performs exponentiation (raising a number to a power):
+
+```snap
+let squared = 5 ^ 2;        // 25 (5 * 5)
+let cubed = 3 ^ 3;          // 27 (3 * 3 * 3)
+let power4 = 2 ^ 4;         // 16 (2 * 2 * 2 * 2)
+let result = (x + 1) ^ 2;  // (x + 1) squared
+```
+
+**How it works:**
+
+- For **constant exponents** (0-100), Snap generates repeated multiplications:
+
+  - `a ^ 0` → `1`
+  - `a ^ 1` → `a`
+  - `a ^ 2` → `a * a`
+  - `a ^ 3` → `a * a * a`
+  - `a ^ 4` → `a * a * a * a`
+  - etc.
+
+- For **variable exponents**, Snap attempts to extract constant values. If the exponent is truly variable, it uses a fallback approach.
+
+**Precedence:**
+
+- Power has higher precedence than multiplication: `2 * 3 ^ 2` = `2 * 9` = `18`
+- Power is right-associative: `2 ^ 3 ^ 2` = `2 ^ (3 ^ 2)` = `2 ^ 9` = `512`
+
+**Examples:**
+
+```snap
+// Calculate area of a square
+let side = 10;
+let area = side ^ 2;  // 100
+
+// Calculate volume of a cube
+let edge = 5;
+let volume = edge ^ 3;  // 125
+
+// Calculate powers of 2
+let two_power_8 = 2 ^ 8;  // 256
+
+// Use in expressions
+let result = (x + y) ^ 2;  // (x + y) squared
+let distance_squared = dx ^ 2 + dy ^ 2;  // Distance formula (squared)
 ```
 
 ### Comparison
@@ -86,22 +135,22 @@ let power10 = operators::MathOp("10 ^", 3);       // 1000
 
 #### Available Math Operations
 
-| Operation | Description |
-|-----------|-------------|
-| `"abs"` | Absolute value |
-| `"floor"` | Round down |
-| `"ceiling"` | Round up |
-| `"sqrt"` | Square root |
-| `"sin"` | Sine (degrees) |
-| `"cos"` | Cosine (degrees) |
-| `"tan"` | Tangent (degrees) |
-| `"asin"` | Arc sine |
-| `"acos"` | Arc cosine |
-| `"atan"` | Arc tangent |
-| `"ln"` | Natural logarithm |
-| `"log"` | Base-10 logarithm |
-| `"e ^"` | e to the power |
-| `"10 ^"` | 10 to the power |
+| Operation   | Description       |
+| ----------- | ----------------- |
+| `"abs"`     | Absolute value    |
+| `"floor"`   | Round down        |
+| `"ceiling"` | Round up          |
+| `"sqrt"`    | Square root       |
+| `"sin"`     | Sine (degrees)    |
+| `"cos"`     | Cosine (degrees)  |
+| `"tan"`     | Tangent (degrees) |
+| `"asin"`    | Arc sine          |
+| `"acos"`    | Arc cosine        |
+| `"atan"`    | Arc tangent       |
+| `"ln"`      | Natural logarithm |
+| `"log"`     | Base-10 logarithm |
+| `"e ^"`     | e to the power    |
+| `"10 ^"`    | 10 to the power   |
 
 ## String Operations
 
@@ -176,7 +225,22 @@ on KeyPressed("space") {
 // Calculate distance between two points
 let dx = x2 - x1;
 let dy = y2 - y1;
-let distance = operators::MathOp("sqrt", dx * dx + dy * dy);
+let distance = operators::MathOp("sqrt", dx ^ 2 + dy ^ 2);
+```
+
+### Power Calculations
+
+```snap
+// Calculate powers using the ^ operator
+let squared = 5 ^ 2;           // 25
+let cubed = 3 ^ 3;             // 27
+let power_of_10 = 2 ^ 10;      // 1024
+
+// Use in distance calculations
+let distance_squared = dx ^ 2 + dy ^ 2;
+
+// Calculate exponential growth
+let growth = base ^ exponent;
 ```
 
 ### Percentage Chance

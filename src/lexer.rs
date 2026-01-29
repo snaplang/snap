@@ -16,6 +16,7 @@ pub enum TokenKind {
     If,
     Else,
     Fn,
+    Warp,
     True,
     False,
 
@@ -49,6 +50,7 @@ pub enum TokenKind {
     Star,       // *
     Slash,      // /
     Percent,    // %
+    Caret,      // ^
     Bang,       // !
     Lt,         // <
     Gt,         // >
@@ -254,6 +256,7 @@ impl Lexer {
             "if" => TokenKind::If,
             "else" => TokenKind::Else,
             "fn" => TokenKind::Fn,
+            "warp" => TokenKind::Warp,
             "true" => TokenKind::True,
             "false" => TokenKind::False,
             "int" => TokenKind::Int,
@@ -337,6 +340,10 @@ impl Lexer {
                 '%' => {
                     self.advance();
                     TokenKind::Percent
+                }
+                '^' => {
+                    self.advance();
+                    TokenKind::Caret
                 }
                 '=' => {
                     self.advance();

@@ -14,7 +14,7 @@ use std::path::Path;
 #[derive(Parser)]
 #[command(name = "snap")]
 #[command(author = "Snap Contributors")]
-#[command(version = "0.1.0")]
+#[command(version = env!("CARGO_PKG_VERSION").is_empty().then(|| "0.1.1").unwrap_or(env!("CARGO_PKG_VERSION")))]
 #[command(
     about = "A programming language that compiles to Scratch (.sb3) projects",
     long_about = None
@@ -129,7 +129,7 @@ new Sprite("Sprite1") {
         .map_err(|e| format!("Failed to create main.sp: {}", e))?;
 
     // Create .gitignore
-    let gitignore_content = "# Build output\n*.sb3\n";
+    let gitignore_content = "# Build output\ntarget/*.sb3\n";
     fs::write(project_path.join(".gitignore"), gitignore_content)
         .map_err(|e| format!("Failed to create .gitignore: {}", e))?;
 
@@ -236,7 +236,12 @@ fn cmd_build(path: &str, output: Option<String>, verbose: bool) -> Result<(), St
     // Determine output path
     let output_path = match output {
         Some(o) => Path::new(&o).to_path_buf(),
-        None => project_path.join(format!("{}.sb3", config.project.name)),
+        None => {
+            let target_dir = project_path.join("target");
+            fs::create_dir_all(&target_dir)
+                .map_err(|e| format!("Failed to create target directory: {}", e))?;
+            target_dir.join(format!("{}.sb3", config.project.name))
+        }
     };
 
     // Package into .sb3
@@ -259,7 +264,9 @@ fn cmd_run(path: &str) -> Result<(), String> {
     let project_path = Path::new(path);
     let config_path = project_path.join("config.toml");
     let config = config::load_config(&config_path)?;
-    let sb3_path = project_path.join(format!("{}.sb3", config.project.name));
+    let sb3_path = project_path
+        .join("target")
+        .join(format!("{}.sb3", config.project.name));
 
     // Try to open in browser with Scratch
     let scratch_url = "https://scratch.mit.edu/projects/editor/?tutorial=getStarted".to_string();

@@ -2,6 +2,7 @@
 #[derive(Debug, Clone)]
 pub struct Program {
     pub imports: Vec<Import>,
+    pub extensions: Vec<String>,
     pub globals: Vec<GlobalVar>,
     pub stage: Option<StageNode>,
     pub sprites: Vec<SpriteNode>,
@@ -18,6 +19,12 @@ pub struct GlobalVar {
     #[allow(dead_code)] // Will be used for type checking in future
     pub var_type: VarType,
     pub initial_value: Expression,
+    /// X position of the variable monitor on screen (optional)
+    pub monitor_x: Option<f64>,
+    /// Y position of the variable monitor on screen (optional)
+    pub monitor_y: Option<f64>,
+    /// Whether the variable monitor is visible (optional, defaults to false)
+    pub monitor_visible: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -72,6 +79,8 @@ pub struct Function {
     pub name: String,
     pub params: Vec<Parameter>,
     pub body: Vec<Statement>,
+    /// Whether the function runs without screen refresh (warp mode)
+    pub warp: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -188,6 +197,7 @@ pub enum BinaryOperator {
     Mul,
     Div,
     Mod,
+    Power,
     Eq,
     NotEq,
     Lt,

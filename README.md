@@ -211,21 +211,20 @@ mdbook serve
 
 ## Project Status
 
-| Feature          | Status   |
-| ---------------- | -------- |
-| Sprites & Stage  | Complete |
-| Motion blocks    | Complete |
-| Looks blocks     | Complete |
-| Sound blocks     | Complete |
-| Control blocks   | Complete |
-| Sensing blocks   | Complete |
-| Events           | Complete |
-| Variables        | Complete |
-| Custom functions | Complete |
-| File imports     | Complete |
-| Lists            | Planned  |
-| Custom costumes  | Planned  |
-| Pen extension    | Planned  |
+| Feature               | Status   |
+| --------------------- | -------- |
+| Basic sprites & stage | Complete |
+| Motion blocks         | Complete |
+| Looks blocks          | Complete |
+| Control blocks        | Complete |
+| Events                | Complete |
+| Variables             | Complete |
+| Custom functions      | Complete |
+| Imports               | Complete |
+| Pen extension         | Complete |
+| Lists                 | Planned  |
+| Custom costumes       | Planned  |
+| Custom sounds         | Planned  |
 
 ## Contributing
 

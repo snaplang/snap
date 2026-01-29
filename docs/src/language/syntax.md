@@ -92,6 +92,7 @@ change speed by -0.5;  // Subtracts 0.5 from speed
 10 * 5     // Multiplication: 50
 10 / 5     // Division: 2
 10 % 3     // Modulo: 1
+2 ^ 3      // Power/Exponentiation: 8 (2 to the power of 3)
 -x         // Negation
 ```
 
@@ -119,12 +120,15 @@ a || b     // Logical OR
 From highest to lowest:
 
 1. `!`, `-` (unary)
-2. `*`, `/`, `%`
-3. `+`, `-`
-4. `<`, `>`, `<=`, `>=`
-5. `==`, `!=`
-6. `&&`
-7. `||`
+2. `^` (power/exponentiation, right-associative)
+3. `*`, `/`, `%`
+4. `+`, `-`
+5. `<`, `>`, `<=`, `>=`
+6. `==`, `!=`
+7. `&&`
+8. `||`
+
+Note: Power is right-associative, so `a ^ b ^ c` is evaluated as `a ^ (b ^ c)`.
 
 Use parentheses to override precedence:
 
