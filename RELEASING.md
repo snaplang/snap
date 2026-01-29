@@ -70,7 +70,7 @@ Before releasing:
 - [ ] All tests pass (`cargo test`)
 - [ ] No compiler warnings (`cargo build --release`)
 - [ ] Documentation is updated
-- [ ] CHANGELOG.md is updated (if you have one)
+- [ ] CHANGELOG.md is updated
 - [ ] Version in Cargo.toml is updated
 
 ## Platform Support
@@ -124,11 +124,3 @@ cargo build --release
 ./target/release/snap new test_release
 ./target/release/snap build test_release
 ```
-
-## After Release
-
-After a successful release:
-
-1. Announce the release (if applicable)
-2. Update documentation links if needed
-3. Close related GitHub issues/milestones
