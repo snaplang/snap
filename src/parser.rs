@@ -1,6 +1,8 @@
 use crate::ast::*;
 use crate::lexer::{Token, TokenKind};
 
+type ParsedMonitorConfig = Result<(Option<f64>, Option<f64>, Option<bool>), String>;
+
 pub struct Parser {
     tokens: Vec<Token>,
     pos: usize,
@@ -163,7 +165,7 @@ impl Parser {
         })
     }
 
-    fn parse_monitor_config(&mut self) -> Result<(Option<f64>, Option<f64>, Option<bool>), String> {
+    fn parse_monitor_config(&mut self) -> ParsedMonitorConfig {
         self.expect(TokenKind::LParen)?;
 
         let mut x = None;

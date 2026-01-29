@@ -1261,7 +1261,7 @@ impl CodeGenerator {
         // Try to extract a constant integer value from the exponent expression
         let exp_value = self.extract_constant_int(exponent);
         if let Some(exp) = exp_value {
-            if exp >= 0 && exp <= 100 {
+            if (0..=100).contains(&exp) {
                 return self.generate_repeated_multiplication(
                     blocks,
                     base,
