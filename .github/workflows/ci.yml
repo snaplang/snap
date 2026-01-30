@@ -75,8 +75,8 @@ jobs:
 
       - name: Verify output
         run: |
-          test -f test_integration/test_integration.sb3
-          unzip -t test_integration/test_integration.sb3
+          test -f test_integration/target/test_integration.sb3
+          unzip -t test_integration/target/test_integration.sb3
 
       - name: Check project structure
         run: |
