@@ -84,10 +84,10 @@ Set the pen color to a specific color value. You can use:
 
 ```snap
 // Using hue values (0-360)
-pen::SetPenColor(operators::Random(1, 360));  // Random hue
-pen::SetPenColor(0);   // Red
-pen::SetPenColor(120);  // Green
-pen::SetPenColor(240); // Blue
+pen::SetPenColor(operators::Random(1, 16777215));  // Random hue
+pen::SetPenColor(16711680);   // Red
+pen::SetPenColor(65280);  // Green
+pen::SetPenColor(255); // Blue
 
 // Using RGB values (0-255 for each component)
 pen::SetPenColor(units::Rgb(255, 0, 0));      // Red
@@ -104,9 +104,9 @@ pen::SetPenColor(units::Rgba(0, 255, 0, 128));   // Semi-transparent green
 pen::SetPenColor(units::Rgba(0, 0, 255, 0));     // Fully transparent blue
 ```
 
-The `units::Rgb(r, g, b)` function calculates the color as: `r + g*256 + b*65536`
+The `units::Rgb(r, g, b)` function calculates the color as: `r*65536 + g*256 + b`
 
-The `units::Rgba(r, g, b, a)` function calculates the color as: `r + g*256 + b*65536 + a*16777216`
+The `units::Rgba(r, g, b, a)` function calculates the color as: `r*65536 + g*256 + b + a*16777216`
 
 ### Change Pen Color
 
