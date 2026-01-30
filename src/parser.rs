@@ -901,26 +901,26 @@ impl Parser {
                                 let b = self.parse_expression()?;
                                 self.expect(TokenKind::RParen)?;
 
-                                // Calculate: r + g*256 + b*65536
+                                // Calculate: r*65536 + g*256 + b
                                 let g_times_256 = Expression::BinaryOp {
                                     left: Box::new(g),
                                     op: BinaryOperator::Mul,
                                     right: Box::new(Expression::IntLiteral(256)),
                                 };
-                                let b_times_65536 = Expression::BinaryOp {
-                                    left: Box::new(b),
+                                let r_times_65536 = Expression::BinaryOp {
+                                    left: Box::new(r),
                                     op: BinaryOperator::Mul,
                                     right: Box::new(Expression::IntLiteral(65536)),
                                 };
-                                let gb_sum = Expression::BinaryOp {
+                                let gr_sum = Expression::BinaryOp {
                                     left: Box::new(g_times_256),
                                     op: BinaryOperator::Add,
-                                    right: Box::new(b_times_65536),
+                                    right: Box::new(r_times_65536),
                                 };
                                 let rgb_sum = Expression::BinaryOp {
-                                    left: Box::new(r),
+                                    left: Box::new(b),
                                     op: BinaryOperator::Add,
-                                    right: Box::new(gb_sum),
+                                    right: Box::new(gr_sum),
                                 };
 
                                 return Ok(Expression::UnitValue {
@@ -937,14 +937,14 @@ impl Parser {
                                 let a = self.parse_expression()?;
                                 self.expect(TokenKind::RParen)?;
 
-                                // Calculate: r + g*256 + b*65536 + a*16777216
+                                // Calculate: a*16777216 + r*65536 + g*256 + b
                                 let g_times_256 = Expression::BinaryOp {
                                     left: Box::new(g),
                                     op: BinaryOperator::Mul,
                                     right: Box::new(Expression::IntLiteral(256)),
                                 };
-                                let b_times_65536 = Expression::BinaryOp {
-                                    left: Box::new(b),
+                                let r_times_65536 = Expression::BinaryOp {
+                                    left: Box::new(r),
                                     op: BinaryOperator::Mul,
                                     right: Box::new(Expression::IntLiteral(65536)),
                                 };
@@ -953,15 +953,15 @@ impl Parser {
                                     op: BinaryOperator::Mul,
                                     right: Box::new(Expression::IntLiteral(16777216)),
                                 };
-                                let gb_sum = Expression::BinaryOp {
+                                let gr_sum = Expression::BinaryOp {
                                     left: Box::new(g_times_256),
                                     op: BinaryOperator::Add,
-                                    right: Box::new(b_times_65536),
+                                    right: Box::new(r_times_65536),
                                 };
                                 let rgb_sum = Expression::BinaryOp {
-                                    left: Box::new(r),
+                                    left: Box::new(b),
                                     op: BinaryOperator::Add,
-                                    right: Box::new(gb_sum),
+                                    right: Box::new(gr_sum),
                                 };
                                 let rgba_sum = Expression::BinaryOp {
                                     left: Box::new(rgb_sum),
