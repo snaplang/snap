@@ -28,7 +28,6 @@ line-numbers = true
 enable = true
 limit-results = 30
 teaser-word-count = 30
-use-hierarchical-search = true
 boost-title = 2
 boost-hierarchy = 1
 boost-paragraph = 1
