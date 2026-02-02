@@ -244,6 +244,20 @@ impl Parser {
                 self.advance();
                 Ok(VarType::String)
             }
+            TokenKind::List => {
+                self.advance();
+                self.expect(TokenKind::Lt)?; // <
+                let inner_type = self.parse_var_type()?;
+                self.expect(TokenKind::Gt)?; // >
+                Ok(VarType::List(Box::new(inner_type)))
+            }
+            TokenKind::Matrix => {
+                self.advance();
+                self.expect(TokenKind::Lt)?; // <
+                let inner_type = self.parse_var_type()?;
+                self.expect(TokenKind::Gt)?; // >
+                Ok(VarType::Matrix(Box::new(inner_type)))
+            }
             _ => Err(format!(
                 "Expected type, found {:?} at {}:{}",
                 self.current_kind(),
@@ -485,13 +499,24 @@ impl Parser {
             return self.parse_if_statement();
         }
 
-        // Check for identifier (could be a block call, function call, or control block)
-        if let TokenKind::Identifier(_ident) = self.current_kind().clone() {
+        // Check for identifier (could be a block call, function call, list operation, or control block)
+        if let TokenKind::Identifier(ident) = self.current_kind().clone() {
             // Check if it's a namespaced block call (e.g., motion::Move)
             let next_pos = self.pos + 1;
             if next_pos < self.tokens.len() {
-                if let TokenKind::ColonColon = &self.tokens[next_pos].kind {
-                    return self.parse_block_call_statement();
+                match &self.tokens[next_pos].kind {
+                    TokenKind::ColonColon => {
+                        return self.parse_block_call_statement();
+                    }
+                    TokenKind::Dot => {
+                        // List method call: list.add(item), list.delete(index), etc.
+                        return self.parse_list_method_statement(ident);
+                    }
+                    TokenKind::LBracket => {
+                        // List index assignment: list[index] = value
+                        return self.parse_list_index_assignment(ident);
+                    }
+                    _ => {}
                 }
             }
 
@@ -505,6 +530,98 @@ impl Parser {
             self.current().line,
             self.current().column
         ))
+    }
+
+    fn parse_list_method_statement(&mut self, list_name: String) -> Result<Statement, String> {
+        self.advance(); // consume identifier
+        self.expect(TokenKind::Dot)?;
+        let method_name = self.parse_identifier()?;
+
+        match method_name.as_str() {
+            "add" => {
+                self.expect(TokenKind::LParen)?;
+                let value = self.parse_expression()?;
+                self.expect(TokenKind::RParen)?;
+                self.expect(TokenKind::Semicolon)?;
+                Ok(Statement::ListAdd {
+                    list: list_name,
+                    value,
+                })
+            }
+            "delete" => {
+                self.expect(TokenKind::LParen)?;
+                let index = if let TokenKind::Identifier(ref ident) = self.current_kind() {
+                    if ident == "all" {
+                        self.advance();
+                        ListIndex::All
+                    } else if ident == "last" {
+                        self.advance();
+                        ListIndex::Last
+                    } else if ident == "random" {
+                        self.advance();
+                        ListIndex::Random
+                    } else {
+                        ListIndex::Index(self.parse_expression()?)
+                    }
+                } else {
+                    ListIndex::Index(self.parse_expression()?)
+                };
+                self.expect(TokenKind::RParen)?;
+                self.expect(TokenKind::Semicolon)?;
+                Ok(Statement::ListDelete {
+                    list: list_name,
+                    index,
+                })
+            }
+            "insert" => {
+                self.expect(TokenKind::LParen)?;
+                let index = self.parse_expression()?;
+                self.expect(TokenKind::Comma)?;
+                let value = self.parse_expression()?;
+                self.expect(TokenKind::RParen)?;
+                self.expect(TokenKind::Semicolon)?;
+                Ok(Statement::ListInsert {
+                    list: list_name,
+                    index,
+                    value,
+                })
+            }
+            "replace" => {
+                self.expect(TokenKind::LParen)?;
+                let index = self.parse_expression()?;
+                self.expect(TokenKind::Comma)?;
+                let value = self.parse_expression()?;
+                self.expect(TokenKind::RParen)?;
+                self.expect(TokenKind::Semicolon)?;
+                Ok(Statement::ListReplace {
+                    list: list_name,
+                    index,
+                    value,
+                })
+            }
+            _ => Err(format!(
+                "Unknown list method: {} at {}:{}",
+                method_name,
+                self.current().line,
+                self.current().column
+            )),
+        }
+    }
+
+    fn parse_list_index_assignment(&mut self, list_name: String) -> Result<Statement, String> {
+        self.advance(); // consume identifier
+        self.expect(TokenKind::LBracket)?;
+        let index = self.parse_expression()?;
+        self.expect(TokenKind::RBracket)?;
+        self.expect(TokenKind::Equals)?;
+        let value = self.parse_expression()?;
+        self.expect(TokenKind::Semicolon)?;
+
+        Ok(Statement::ListReplace {
+            list: list_name,
+            index,
+            value,
+        })
     }
 
     fn parse_set_variable(&mut self) -> Result<Statement, String> {
@@ -877,6 +994,10 @@ impl Parser {
                 self.expect(TokenKind::RParen)?;
                 Ok(expr)
             }
+            TokenKind::LBracket => {
+                // List or matrix literal: [1, 2, 3] or [[1, 2], [3, 4]]
+                self.parse_list_or_matrix_literal()
+            }
             TokenKind::Identifier(ident) => {
                 // Check if it's a namespaced call (reporter or unit)
                 let next_pos = self.pos + 1;
@@ -1008,9 +1129,9 @@ impl Parser {
                     }
                 }
 
-                // Just a variable reference
+                // Just a variable reference, but check for index access or method calls
                 self.advance();
-                Ok(Expression::Variable(ident))
+                self.parse_postfix_expr(ident)
             }
             _ => Err(format!(
                 "Unexpected token in expression: {:?} at {}:{}",
@@ -1019,6 +1140,121 @@ impl Parser {
                 self.current().column
             )),
         }
+    }
+
+    /// Parse list or matrix literal: [1, 2, 3] or [[1, 2], [3, 4]]
+    fn parse_list_or_matrix_literal(&mut self) -> Result<Expression, String> {
+        self.expect(TokenKind::LBracket)?;
+
+        // Empty list
+        if self.check(&TokenKind::RBracket) {
+            self.advance();
+            return Ok(Expression::ListLiteral(Vec::new()));
+        }
+
+        // Check if first element is a bracket (matrix)
+        if self.check(&TokenKind::LBracket) {
+            // Matrix literal
+            let mut rows = Vec::new();
+            while !self.check(&TokenKind::RBracket) {
+                self.expect(TokenKind::LBracket)?;
+                let mut row = Vec::new();
+                while !self.check(&TokenKind::RBracket) {
+                    row.push(self.parse_expression()?);
+                    if !self.check(&TokenKind::RBracket) {
+                        self.expect(TokenKind::Comma)?;
+                    }
+                }
+                self.expect(TokenKind::RBracket)?;
+                rows.push(row);
+                if !self.check(&TokenKind::RBracket) {
+                    self.expect(TokenKind::Comma)?;
+                }
+            }
+            self.expect(TokenKind::RBracket)?;
+            return Ok(Expression::MatrixLiteral(rows));
+        }
+
+        // List literal
+        let mut items = Vec::new();
+        while !self.check(&TokenKind::RBracket) {
+            items.push(self.parse_expression()?);
+            if !self.check(&TokenKind::RBracket) {
+                self.expect(TokenKind::Comma)?;
+            }
+        }
+        self.expect(TokenKind::RBracket)?;
+        Ok(Expression::ListLiteral(items))
+    }
+
+    /// Parse postfix expressions: index access (list[i]) and method calls (list.length())
+    fn parse_postfix_expr(&mut self, name: String) -> Result<Expression, String> {
+        // Check for index access: list[index]
+        if self.check(&TokenKind::LBracket) {
+            self.advance();
+            let index = self.parse_expression()?;
+            self.expect(TokenKind::RBracket)?;
+
+            // Check for second index (matrix access): matrix[row][col]
+            if self.check(&TokenKind::LBracket) {
+                self.advance();
+                let col = self.parse_expression()?;
+                self.expect(TokenKind::RBracket)?;
+                return Ok(Expression::MatrixAccess {
+                    matrix: name,
+                    row: Box::new(index),
+                    col: Box::new(col),
+                });
+            }
+
+            return Ok(Expression::IndexAccess {
+                list: name,
+                index: Box::new(index),
+            });
+        }
+
+        // Check for method calls: list.length(), list.contains(x), list.index_of(x)
+        if self.check(&TokenKind::Dot) {
+            self.advance();
+            let method_name = self.parse_identifier()?;
+
+            match method_name.as_str() {
+                "length" => {
+                    self.expect(TokenKind::LParen)?;
+                    self.expect(TokenKind::RParen)?;
+                    return Ok(Expression::ListLength { list: name });
+                }
+                "contains" => {
+                    self.expect(TokenKind::LParen)?;
+                    let item = self.parse_expression()?;
+                    self.expect(TokenKind::RParen)?;
+                    return Ok(Expression::ListContains {
+                        list: name,
+                        item: Box::new(item),
+                    });
+                }
+                "index_of" => {
+                    self.expect(TokenKind::LParen)?;
+                    let item = self.parse_expression()?;
+                    self.expect(TokenKind::RParen)?;
+                    return Ok(Expression::ListIndexOf {
+                        list: name,
+                        item: Box::new(item),
+                    });
+                }
+                _ => {
+                    return Err(format!(
+                        "Unknown list method: {} at {}:{}",
+                        method_name,
+                        self.current().line,
+                        self.current().column
+                    ));
+                }
+            }
+        }
+
+        // Just a variable reference
+        Ok(Expression::Variable(name))
     }
 
     // Helper functions

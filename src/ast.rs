@@ -33,6 +33,8 @@ pub enum VarType {
     Float,
     Bool,
     String,
+    List(Box<VarType>),
+    Matrix(Box<VarType>),
 }
 
 #[derive(Debug, Clone)]
@@ -140,6 +142,40 @@ pub enum Statement {
 
     /// Custom function call
     FunctionCall { name: String, args: Vec<Expression> },
+
+    // List operations
+    /// Add item to list: `list.add(item)`
+    ListAdd { list: String, value: Expression },
+
+    /// Delete item from list: `list.delete(index)` or `list.delete_all()`
+    ListDelete { list: String, index: ListIndex },
+
+    /// Insert item at index: `list.insert(index, item)`
+    ListInsert {
+        list: String,
+        index: Expression,
+        value: Expression,
+    },
+
+    /// Replace item at index: `list.replace(index, item)` or `list[index] = item`
+    ListReplace {
+        list: String,
+        index: Expression,
+        value: Expression,
+    },
+}
+
+/// Index for list operations
+#[derive(Debug, Clone)]
+pub enum ListIndex {
+    /// A specific index (0-based in source, converted to 1-based for Scratch)
+    Index(Expression),
+    /// Delete all items
+    All,
+    /// Last item
+    Last,
+    /// Random item
+    Random,
 }
 
 #[derive(Debug, Clone)]
@@ -188,6 +224,34 @@ pub enum Expression {
         unit: String,
         value: Box<Expression>,
     },
+
+    /// List literal: `[1, 2, 3]`
+    ListLiteral(Vec<Expression>),
+
+    /// Matrix literal: `[[1, 2], [3, 4]]`
+    MatrixLiteral(Vec<Vec<Expression>>),
+
+    /// List/array index access: `list[index]` (0-based, converted to 1-based for Scratch)
+    IndexAccess {
+        list: String,
+        index: Box<Expression>,
+    },
+
+    /// Matrix index access: `matrix[row][col]` (0-based, converted to 1-based for Scratch)
+    MatrixAccess {
+        matrix: String,
+        row: Box<Expression>,
+        col: Box<Expression>,
+    },
+
+    /// List length: `list.length()`
+    ListLength { list: String },
+
+    /// List contains: `list.contains(item)`
+    ListContains { list: String, item: Box<Expression> },
+
+    /// List item index: `list.index_of(item)` (returns 0-based index)
+    ListIndexOf { list: String, item: Box<Expression> },
 }
 
 #[derive(Debug, Clone, PartialEq)]

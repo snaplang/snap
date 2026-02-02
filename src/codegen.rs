@@ -9,6 +9,8 @@ pub struct CodeGenerator {
     block_counter: u64,
     /// Map of variable names to their IDs
     variables: HashMap<String, String>,
+    /// Map of list names to their IDs
+    lists: HashMap<String, String>,
     /// Map of broadcast names to their IDs
     broadcasts: HashMap<String, String>,
     /// Current Y position for placing top-level blocks
@@ -20,6 +22,7 @@ impl CodeGenerator {
         CodeGenerator {
             block_counter: 0,
             variables: HashMap::new(),
+            lists: HashMap::new(),
             broadcasts: HashMap::new(),
             current_y: 0.0,
         }
@@ -37,6 +40,16 @@ impl CodeGenerator {
         } else {
             let id = self.generate_id();
             self.variables.insert(name.to_string(), id.clone());
+            id
+        }
+    }
+
+    fn get_or_create_list(&mut self, name: &str) -> String {
+        if let Some(id) = self.lists.get(name) {
+            id.clone()
+        } else {
+            let id = self.generate_id();
+            self.lists.insert(name.to_string(), id.clone());
             id
         }
     }
@@ -175,11 +188,24 @@ impl CodeGenerator {
 
     fn add_global_variables(&mut self, target: &mut Target, globals: &[GlobalVar]) {
         for global in globals {
-            let var_id = self.get_or_create_variable(&global.name);
-            let initial_value = self.expr_to_json_value(&global.initial_value);
-            target
-                .variables
-                .insert(var_id, Variable::new(&global.name, initial_value));
+            match &global.var_type {
+                VarType::List(_) | VarType::Matrix(_) => {
+                    // Handle list/matrix types
+                    let list_id = self.get_or_create_list(&global.name);
+                    let initial_items = self.expr_to_list_items(&global.initial_value);
+                    target
+                        .lists
+                        .insert(list_id, List::new(&global.name, initial_items));
+                }
+                _ => {
+                    // Handle scalar types
+                    let var_id = self.get_or_create_variable(&global.name);
+                    let initial_value = self.expr_to_json_value(&global.initial_value);
+                    target
+                        .variables
+                        .insert(var_id, Variable::new(&global.name, initial_value));
+                }
+            }
         }
     }
 
@@ -190,6 +216,22 @@ impl CodeGenerator {
             Expression::StringLiteral(s) => serde_json::json!(s),
             Expression::BoolLiteral(b) => serde_json::json!(if *b { 1 } else { 0 }),
             _ => serde_json::json!(0),
+        }
+    }
+
+    fn expr_to_list_items(&self, expr: &Expression) -> Vec<serde_json::Value> {
+        match expr {
+            Expression::ListLiteral(items) => {
+                items.iter().map(|e| self.expr_to_json_value(e)).collect()
+            }
+            Expression::MatrixLiteral(rows) => {
+                // Flatten matrix into a single list for Scratch
+                // Store as: [row0_col0, row0_col1, ..., row1_col0, row1_col1, ...]
+                rows.iter()
+                    .flat_map(|row| row.iter().map(|e| self.expr_to_json_value(e)))
+                    .collect()
+            }
+            _ => Vec::new(),
         }
     }
 
@@ -631,6 +673,111 @@ impl CodeGenerator {
                 blocks.insert(block_id.clone(), block);
                 Some(block_id)
             }
+
+            // List operations
+            Statement::ListAdd { list, value } => {
+                let block_id = self.generate_id();
+                let list_id = self.get_or_create_list(list);
+                let mut block = Block::new("data_addtolist");
+                block.parent = parent_id.map(|s| s.to_string());
+                block
+                    .fields
+                    .insert("LIST".to_string(), Field::new(list, Some(&list_id)));
+
+                let value_input = self.generate_input(blocks, value, &block_id);
+                block.inputs.insert("ITEM".to_string(), value_input);
+
+                blocks.insert(block_id.clone(), block);
+                Some(block_id)
+            }
+
+            Statement::ListDelete { list, index } => {
+                let block_id = self.generate_id();
+                let list_id = self.get_or_create_list(list);
+                let mut block = Block::new("data_deleteoflist");
+                block.parent = parent_id.map(|s| s.to_string());
+                block
+                    .fields
+                    .insert("LIST".to_string(), Field::new(list, Some(&list_id)));
+
+                let index_input = self.generate_list_index_input(blocks, index, &block_id);
+                block.inputs.insert("INDEX".to_string(), index_input);
+
+                blocks.insert(block_id.clone(), block);
+                Some(block_id)
+            }
+
+            Statement::ListInsert { list, index, value } => {
+                let block_id = self.generate_id();
+                let list_id = self.get_or_create_list(list);
+                let mut block = Block::new("data_insertatlist");
+                block.parent = parent_id.map(|s| s.to_string());
+                block
+                    .fields
+                    .insert("LIST".to_string(), Field::new(list, Some(&list_id)));
+
+                // Convert 0-based index to 1-based for Scratch
+                let index_plus_one = Expression::BinaryOp {
+                    left: Box::new(index.clone()),
+                    op: BinaryOperator::Add,
+                    right: Box::new(Expression::IntLiteral(1)),
+                };
+                let index_input = self.generate_input(blocks, &index_plus_one, &block_id);
+                block.inputs.insert("INDEX".to_string(), index_input);
+
+                let value_input = self.generate_input(blocks, value, &block_id);
+                block.inputs.insert("ITEM".to_string(), value_input);
+
+                blocks.insert(block_id.clone(), block);
+                Some(block_id)
+            }
+
+            Statement::ListReplace { list, index, value } => {
+                let block_id = self.generate_id();
+                let list_id = self.get_or_create_list(list);
+                let mut block = Block::new("data_replaceitemoflist");
+                block.parent = parent_id.map(|s| s.to_string());
+                block
+                    .fields
+                    .insert("LIST".to_string(), Field::new(list, Some(&list_id)));
+
+                // Convert 0-based index to 1-based for Scratch
+                let index_plus_one = Expression::BinaryOp {
+                    left: Box::new(index.clone()),
+                    op: BinaryOperator::Add,
+                    right: Box::new(Expression::IntLiteral(1)),
+                };
+                let index_input = self.generate_input(blocks, &index_plus_one, &block_id);
+                block.inputs.insert("INDEX".to_string(), index_input);
+
+                let value_input = self.generate_input(blocks, value, &block_id);
+                block.inputs.insert("ITEM".to_string(), value_input);
+
+                blocks.insert(block_id.clone(), block);
+                Some(block_id)
+            }
+        }
+    }
+
+    fn generate_list_index_input(
+        &mut self,
+        blocks: &mut HashMap<String, Block>,
+        index: &ListIndex,
+        parent_id: &str,
+    ) -> Input {
+        match index {
+            ListIndex::Index(expr) => {
+                // Convert 0-based index to 1-based for Scratch
+                let index_plus_one = Expression::BinaryOp {
+                    left: Box::new(expr.clone()),
+                    op: BinaryOperator::Add,
+                    right: Box::new(Expression::IntLiteral(1)),
+                };
+                self.generate_input(blocks, &index_plus_one, parent_id)
+            }
+            ListIndex::All => Input::literal(input_types::STRING, serde_json::json!("all")),
+            ListIndex::Last => Input::literal(input_types::STRING, serde_json::json!("last")),
+            ListIndex::Random => Input::literal(input_types::STRING, serde_json::json!("random")),
         }
     }
 
@@ -1000,6 +1147,131 @@ impl CodeGenerator {
 
                 blocks.insert(reporter_id.clone(), reporter_block);
                 Input::block(&reporter_id)
+            }
+
+            // List expressions
+            Expression::ListLiteral(_) | Expression::MatrixLiteral(_) => {
+                // List/matrix literals are handled during variable initialization
+                // If used in an expression context, return empty string
+                Input::literal(input_types::STRING, serde_json::json!(""))
+            }
+
+            Expression::IndexAccess { list, index } => {
+                // data_itemoflist: get item at index from list
+                let block_id = self.generate_id();
+                let list_id = self.get_or_create_list(list);
+                let mut block = Block::new("data_itemoflist");
+                block.parent = Some(parent_id.to_string());
+                block
+                    .fields
+                    .insert("LIST".to_string(), Field::new(list, Some(&list_id)));
+
+                // Convert 0-based index to 1-based for Scratch
+                let index_plus_one = Expression::BinaryOp {
+                    left: index.clone(),
+                    op: BinaryOperator::Add,
+                    right: Box::new(Expression::IntLiteral(1)),
+                };
+                let index_input = self.generate_input(blocks, &index_plus_one, &block_id);
+                block.inputs.insert("INDEX".to_string(), index_input);
+
+                blocks.insert(block_id.clone(), block);
+                Input::block(&block_id)
+            }
+
+            Expression::MatrixAccess { matrix, row, col } => {
+                // For matrices stored as flattened lists, calculate: row * num_cols + col + 1
+                // Since we don't know num_cols at compile time, we'll need to store it
+                // For now, assume matrices are stored row-major and use a helper approach
+                // This generates: data_itemoflist with index = row * width + col + 1
+                // We'll use a simplified approach: treat as 1D list access
+                let block_id = self.generate_id();
+                let list_id = self.get_or_create_list(matrix);
+                let mut block = Block::new("data_itemoflist");
+                block.parent = Some(parent_id.to_string());
+                block
+                    .fields
+                    .insert("LIST".to_string(), Field::new(matrix, Some(&list_id)));
+
+                // For matrix access, we need to calculate the linear index
+                // Assuming row-major order: index = row * num_cols + col
+                // Since we don't have num_cols, we'll create a compound expression
+                // For now, use a placeholder that assumes the user handles indexing
+                // A proper implementation would require storing matrix dimensions
+                let index_expr = Expression::BinaryOp {
+                    left: Box::new(Expression::BinaryOp {
+                        left: row.clone(),
+                        op: BinaryOperator::Add,
+                        right: col.clone(),
+                    }),
+                    op: BinaryOperator::Add,
+                    right: Box::new(Expression::IntLiteral(1)),
+                };
+                let index_input = self.generate_input(blocks, &index_expr, &block_id);
+                block.inputs.insert("INDEX".to_string(), index_input);
+
+                blocks.insert(block_id.clone(), block);
+                Input::block(&block_id)
+            }
+
+            Expression::ListLength { list } => {
+                let block_id = self.generate_id();
+                let list_id = self.get_or_create_list(list);
+                let mut block = Block::new("data_lengthoflist");
+                block.parent = Some(parent_id.to_string());
+                block
+                    .fields
+                    .insert("LIST".to_string(), Field::new(list, Some(&list_id)));
+
+                blocks.insert(block_id.clone(), block);
+                Input::block(&block_id)
+            }
+
+            Expression::ListContains { list, item } => {
+                let block_id = self.generate_id();
+                let list_id = self.get_or_create_list(list);
+                let mut block = Block::new("data_listcontainsitem");
+                block.parent = Some(parent_id.to_string());
+                block
+                    .fields
+                    .insert("LIST".to_string(), Field::new(list, Some(&list_id)));
+
+                let item_input = self.generate_input(blocks, item, &block_id);
+                block.inputs.insert("ITEM".to_string(), item_input);
+
+                blocks.insert(block_id.clone(), block);
+                Input::block(&block_id)
+            }
+
+            Expression::ListIndexOf { list, item } => {
+                // data_itemnumoflist returns 1-based index, we convert to 0-based
+                let block_id = self.generate_id();
+                let list_id = self.get_or_create_list(list);
+                let mut block = Block::new("data_itemnumoflist");
+                block.parent = Some(parent_id.to_string());
+                block
+                    .fields
+                    .insert("LIST".to_string(), Field::new(list, Some(&list_id)));
+
+                let item_input = self.generate_input(blocks, item, &block_id);
+                block.inputs.insert("ITEM".to_string(), item_input);
+
+                blocks.insert(block_id.clone(), block);
+
+                // Subtract 1 to convert from 1-based to 0-based index
+                let sub_block_id = self.generate_id();
+                let mut sub_block = Block::new("operator_subtract");
+                sub_block.parent = Some(parent_id.to_string());
+                sub_block
+                    .inputs
+                    .insert("NUM1".to_string(), Input::block(&block_id));
+                sub_block.inputs.insert(
+                    "NUM2".to_string(),
+                    Input::literal(input_types::NUMBER, serde_json::json!("1")),
+                );
+
+                blocks.insert(sub_block_id.clone(), sub_block);
+                Input::block(&sub_block_id)
             }
         }
     }

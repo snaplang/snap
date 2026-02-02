@@ -245,6 +245,23 @@ impl Input {
             serde_json::json!([10, ""]),
         ])
     }
+
+    /// Create a list input
+    /// Format: [3, [13, list_name, list_id], [type, default]]
+    #[allow(dead_code)] // Utility method for future use
+    pub fn list(list_name: &str, list_id: &str) -> Self {
+        Input(vec![
+            serde_json::json!(3),
+            serde_json::json!([13, list_name, list_id]),
+            serde_json::json!([10, ""]),
+        ])
+    }
+}
+
+impl List {
+    pub fn new(name: &str, items: Vec<serde_json::Value>) -> Self {
+        List((name.to_string(), items))
+    }
 }
 
 /// Field values in Scratch blocks

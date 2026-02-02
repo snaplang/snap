@@ -21,6 +21,7 @@
   - [Sensing](./language/blocks/sensing.md)
   - [Operators](./language/blocks/operators.md)
   - [Variables](./language/blocks/variables.md)
+  - [Lists & Matrices](./language/blocks/lists.md)
   - [Pen](./language/blocks/pen.md)
 - [Control Flow](./language/control-flow.md)
 - [Custom Functions](./language/functions.md)

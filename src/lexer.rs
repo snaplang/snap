@@ -25,6 +25,8 @@ pub enum TokenKind {
     Float,
     Bool,
     String,
+    List,
+    Matrix,
 
     // Identifiers and literals
     Identifier(String),
@@ -263,6 +265,8 @@ impl Lexer {
             "float" => TokenKind::Float,
             "bool" => TokenKind::Bool,
             "string" => TokenKind::String,
+            "list" => TokenKind::List,
+            "matrix" => TokenKind::Matrix,
             _ => TokenKind::Identifier(ident.to_string()),
         }
     }
