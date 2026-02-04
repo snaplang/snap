@@ -53,6 +53,11 @@ pub enum TokenKind {
     Slash,      // /
     Percent,    // %
     Caret,      // ^
+    PlusEq,     // +=
+    MinusEq,    // -=
+    StarEq,     // *=
+    SlashEq,    // /=
+    CaretEq,    // ^=
     Bang,       // !
     Lt,         // <
     Gt,         // >
@@ -327,19 +332,39 @@ impl Lexer {
                 }
                 '+' => {
                     self.advance();
-                    TokenKind::Plus
+                    if self.current() == Some('=') {
+                        self.advance();
+                        TokenKind::PlusEq
+                    } else {
+                        TokenKind::Plus
+                    }
                 }
                 '-' => {
                     self.advance();
-                    TokenKind::Minus
+                    if self.current() == Some('=') {
+                        self.advance();
+                        TokenKind::MinusEq
+                    } else {
+                        TokenKind::Minus
+                    }
                 }
                 '*' => {
                     self.advance();
-                    TokenKind::Star
+                    if self.current() == Some('=') {
+                        self.advance();
+                        TokenKind::StarEq
+                    } else {
+                        TokenKind::Star
+                    }
                 }
                 '/' => {
                     self.advance();
-                    TokenKind::Slash
+                    if self.current() == Some('=') {
+                        self.advance();
+                        TokenKind::SlashEq
+                    } else {
+                        TokenKind::Slash
+                    }
                 }
                 '%' => {
                     self.advance();
@@ -347,7 +372,12 @@ impl Lexer {
                 }
                 '^' => {
                     self.advance();
-                    TokenKind::Caret
+                    if self.current() == Some('=') {
+                        self.advance();
+                        TokenKind::CaretEq
+                    } else {
+                        TokenKind::Caret
+                    }
                 }
                 '=' => {
                     self.advance();

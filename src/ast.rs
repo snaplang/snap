@@ -37,6 +37,21 @@ pub enum VarType {
     Matrix(Box<VarType>),
 }
 
+/// Operator for compound assignment (change variable)
+#[derive(Debug, Clone, PartialEq)]
+pub enum ChangeOp {
+    /// Addition: `change x += 1` or `change x by 1`
+    Add,
+    /// Subtraction: `change x -= 1`
+    Sub,
+    /// Multiplication: `change x *= 2`
+    Mul,
+    /// Division: `change x /= 2`
+    Div,
+    /// Power: `change x ^= 2`
+    Pow,
+}
+
 #[derive(Debug, Clone)]
 pub struct StageNode {
     #[allow(dead_code)] // Will be used for custom backdrops in future
@@ -99,8 +114,12 @@ pub enum Statement {
     /// Variable assignment: `set score = 10`
     SetVariable { name: String, value: Expression },
 
-    /// Variable change: `change score by 1`
-    ChangeVariable { name: String, value: Expression },
+    /// Variable change: `change score by 1` or `change score += 1`
+    ChangeVariable {
+        name: String,
+        value: Expression,
+        op: ChangeOp,
+    },
 
     /// If statement
     If {

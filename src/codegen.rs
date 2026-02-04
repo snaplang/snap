@@ -480,20 +480,115 @@ impl CodeGenerator {
                 Some(block_id)
             }
 
-            Statement::ChangeVariable { name, value } => {
+            Statement::ChangeVariable { name, value, op } => {
                 let block_id = self.generate_id();
                 let var_id = self.get_or_create_variable(name);
-                let mut block = Block::new("data_changevariableby");
-                block.parent = parent_id.map(|s| s.to_string());
-                block
-                    .fields
-                    .insert("VARIABLE".to_string(), Field::new(name, Some(&var_id)));
 
-                let value_input = self.generate_input(blocks, value, &block_id);
-                block.inputs.insert("VALUE".to_string(), value_input);
+                match op {
+                    ChangeOp::Add => {
+                        // Use native Scratch "change variable by" block
+                        let mut block = Block::new("data_changevariableby");
+                        block.parent = parent_id.map(|s| s.to_string());
+                        block
+                            .fields
+                            .insert("VARIABLE".to_string(), Field::new(name, Some(&var_id)));
 
-                blocks.insert(block_id.clone(), block);
-                Some(block_id)
+                        let value_input = self.generate_input(blocks, value, &block_id);
+                        block.inputs.insert("VALUE".to_string(), value_input);
+
+                        blocks.insert(block_id.clone(), block);
+                        Some(block_id)
+                    }
+                    _ => {
+                        // For other operations, generate: set variable to (variable OP value)
+                        let mut block = Block::new("data_setvariableto");
+                        block.parent = parent_id.map(|s| s.to_string());
+                        block
+                            .fields
+                            .insert("VARIABLE".to_string(), Field::new(name, Some(&var_id)));
+
+                        // Create the operator block
+                        let op_block_id = self.generate_id();
+                        let opcode = match op {
+                            ChangeOp::Sub => "operator_subtract",
+                            ChangeOp::Mul => "operator_multiply",
+                            ChangeOp::Div => "operator_divide",
+                            ChangeOp::Pow => "operator_mathop",
+                            ChangeOp::Add => unreachable!(),
+                        };
+
+                        if *op == ChangeOp::Pow {
+                            // Power uses mathop with "e ^" and "ln" to compute: e^(ln(base) * exponent) = base^exponent
+
+                            // Create ln(var) block
+                            let ln_block_id = self.generate_id();
+                            let mut ln_block = Block::new("operator_mathop");
+                            ln_block.parent = Some(op_block_id.clone());
+                            ln_block
+                                .fields
+                                .insert("OPERATOR".to_string(), Field::new("ln", None));
+                            // Input is the variable
+                            let var_input = Input::variable(name, &var_id);
+                            ln_block.inputs.insert("NUM".to_string(), var_input);
+                            blocks.insert(ln_block_id.clone(), ln_block);
+
+                            // Create multiply block: ln(var) * value
+                            let mul_block_id = self.generate_id();
+                            let mut mul_block = Block::new("operator_multiply");
+                            mul_block.parent = Some(op_block_id.clone());
+                            mul_block
+                                .inputs
+                                .insert("NUM1".to_string(), Input::block(&ln_block_id));
+                            // Update ln_block parent
+                            if let Some(ln_b) = blocks.get_mut(&ln_block_id) {
+                                ln_b.parent = Some(mul_block_id.clone());
+                            }
+                            let value_input = self.generate_input(blocks, value, &mul_block_id);
+                            mul_block.inputs.insert("NUM2".to_string(), value_input);
+                            blocks.insert(mul_block_id.clone(), mul_block);
+
+                            // Create e^ block: e^(ln(var) * value)
+                            let mut exp_block = Block::new("operator_mathop");
+                            exp_block.parent = Some(block_id.clone());
+                            exp_block
+                                .fields
+                                .insert("OPERATOR".to_string(), Field::new("e ^", None));
+                            exp_block
+                                .inputs
+                                .insert("NUM".to_string(), Input::block(&mul_block_id));
+                            // Update mul_block parent
+                            if let Some(mul_b) = blocks.get_mut(&mul_block_id) {
+                                mul_b.parent = Some(op_block_id.clone());
+                            }
+                            blocks.insert(op_block_id.clone(), exp_block);
+
+                            block
+                                .inputs
+                                .insert("VALUE".to_string(), Input::block(&op_block_id));
+                        } else {
+                            // For sub, mul, div - create a simple operator block
+                            let mut op_block = Block::new(opcode);
+                            op_block.parent = Some(block_id.clone());
+
+                            // NUM1 is the current variable value
+                            let var_input = Input::variable(name, &var_id);
+                            op_block.inputs.insert("NUM1".to_string(), var_input);
+
+                            // NUM2 is the value to operate with
+                            let value_input = self.generate_input(blocks, value, &op_block_id);
+                            op_block.inputs.insert("NUM2".to_string(), value_input);
+
+                            blocks.insert(op_block_id.clone(), op_block);
+
+                            block
+                                .inputs
+                                .insert("VALUE".to_string(), Input::block(&op_block_id));
+                        }
+
+                        blocks.insert(block_id.clone(), block);
+                        Some(block_id)
+                    }
+                }
             }
 
             Statement::If {

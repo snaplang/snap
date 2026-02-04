@@ -656,16 +656,45 @@ impl Parser {
         self.expect(TokenKind::Change)?;
         let name = self.parse_identifier()?;
 
-        // Expect "by" as an identifier
-        let by_keyword = self.parse_identifier()?;
-        if by_keyword != "by" {
-            return Err("Expected 'by' after variable name in change statement".to_string());
-        }
+        // Check for compound assignment operators or "by" keyword
+        let op = match self.current_kind() {
+            TokenKind::PlusEq => {
+                self.advance();
+                ChangeOp::Add
+            }
+            TokenKind::MinusEq => {
+                self.advance();
+                ChangeOp::Sub
+            }
+            TokenKind::StarEq => {
+                self.advance();
+                ChangeOp::Mul
+            }
+            TokenKind::SlashEq => {
+                self.advance();
+                ChangeOp::Div
+            }
+            TokenKind::CaretEq => {
+                self.advance();
+                ChangeOp::Pow
+            }
+            TokenKind::Identifier(ref ident) if ident == "by" => {
+                self.advance();
+                ChangeOp::Add
+            }
+            _ => {
+                return Err(format!(
+                    "Expected compound assignment operator (+=, -=, *=, /=, ^=) or 'by' after variable name in change statement at {}:{}",
+                    self.current().line,
+                    self.current().column
+                ));
+            }
+        };
 
         let value = self.parse_expression()?;
         self.expect(TokenKind::Semicolon)?;
 
-        Ok(Statement::ChangeVariable { name, value })
+        Ok(Statement::ChangeVariable { name, value, op })
     }
 
     fn parse_if_statement(&mut self) -> Result<Statement, String> {

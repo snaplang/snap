@@ -76,6 +76,28 @@ change speed by 0.5;     // speed = speed + 0.5
 change lives by -1;      // lives = lives - 1
 ```
 
+### Compound Assignment Operators
+
+You can also use compound assignment operators for more operations:
+
+```snap
+change score += 10;      // score = score + 10 (same as "change score by 10")
+change score -= 5;       // score = score - 5
+change score *= 2;       // score = score * 2
+change score /= 2;       // score = score / 2
+change score ^= 2;       // score = score ^ 2 (power/exponent)
+```
+
+| Operator | Description    | Equivalent Expression |
+| -------- | -------------- | --------------------- |
+| `+=`     | Addition       | `var = var + value`   |
+| `-=`     | Subtraction    | `var = var - value`   |
+| `*=`     | Multiplication | `var = var * value`   |
+| `/=`     | Division       | `var = var / value`   |
+| `^=`     | Power          | `var = var ^ value`   |
+
+Note: The `+=` operator and `by` keyword are equivalent - both add to the variable.
+
 ## Variable Scope
 
 Currently, all variables in Snap are **global**, meaning they can be accessed from any sprite.
