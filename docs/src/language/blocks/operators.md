@@ -32,7 +32,6 @@ let result = (x + 1) ^ 2;  // (x + 1) squared
 **How it works:**
 
 - For **constant exponents** (0-100), Snap generates repeated multiplications:
-
   - `a ^ 0` → `1`
   - `a ^ 1` → `a`
   - `a ^ 2` → `a * a`
@@ -40,7 +39,7 @@ let result = (x + 1) ^ 2;  // (x + 1) squared
   - `a ^ 4` → `a * a * a * a`
   - etc.
 
-- For **variable exponents**, Snap attempts to extract constant values. If the exponent is truly variable, it uses a fallback approach.
+- For **variable or large exponents** (>100), Snap uses the mathematical identity `e^(ln(base) * exponent)` to compute the result. This works for any positive base and any exponent value.
 
 **Precedence:**
 

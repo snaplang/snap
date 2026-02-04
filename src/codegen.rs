@@ -1694,15 +1694,65 @@ impl CodeGenerator {
             }
         }
 
-        // For non-constant exponents, create a structure using a temporary variable
-        // This creates: result = 1; repeat exponent times { result = result * base }
-        // But since we can't create loops in expressions, we'll use base^2 as a fallback
-        // and note that full variable exponent support requires using a custom function
+        // For variable or large exponents, use the mathematical identity:
+        // base^exponent = e^(ln(base) * exponent)
+        // This works for any positive base and any exponent value
+        self.generate_power_via_exp_ln(blocks, base, exponent, parent_id)
+    }
 
-        // For non-constant exponents, use base^2 as a safe fallback
-        // In a full implementation, this would generate a helper function
-        // that creates a loop to calculate the power
-        self.generate_repeated_multiplication(blocks, base, 2, parent_id)
+    fn generate_power_via_exp_ln(
+        &mut self,
+        blocks: &mut HashMap<String, Block>,
+        base: &Expression,
+        exponent: &Expression,
+        parent_id: &str,
+    ) -> Input {
+        // Generate: e^(ln(base) * exponent)
+        // This is the standard mathematical approach for computing arbitrary powers
+
+        // Create ln(base) block
+        let ln_block_id = self.generate_id();
+        let mut ln_block = Block::new("operator_mathop");
+        ln_block.parent = Some(parent_id.to_string());
+        ln_block
+            .fields
+            .insert("OPERATOR".to_string(), Field::new("ln", None));
+        let base_input = self.generate_input(blocks, base, &ln_block_id);
+        ln_block.inputs.insert("NUM".to_string(), base_input);
+        blocks.insert(ln_block_id.clone(), ln_block);
+
+        // Create multiply block: ln(base) * exponent
+        let mul_block_id = self.generate_id();
+        let mut mul_block = Block::new("operator_multiply");
+        mul_block.parent = Some(parent_id.to_string());
+        mul_block
+            .inputs
+            .insert("NUM1".to_string(), Input::block(&ln_block_id));
+        // Update ln_block parent to point to mul_block
+        if let Some(ln_b) = blocks.get_mut(&ln_block_id) {
+            ln_b.parent = Some(mul_block_id.clone());
+        }
+        let exp_input = self.generate_input(blocks, exponent, &mul_block_id);
+        mul_block.inputs.insert("NUM2".to_string(), exp_input);
+        blocks.insert(mul_block_id.clone(), mul_block);
+
+        // Create e^ block: e^(ln(base) * exponent)
+        let exp_block_id = self.generate_id();
+        let mut exp_block = Block::new("operator_mathop");
+        exp_block.parent = Some(parent_id.to_string());
+        exp_block
+            .fields
+            .insert("OPERATOR".to_string(), Field::new("e ^", None));
+        exp_block
+            .inputs
+            .insert("NUM".to_string(), Input::block(&mul_block_id));
+        // Update mul_block parent to point to exp_block
+        if let Some(mul_b) = blocks.get_mut(&mul_block_id) {
+            mul_b.parent = Some(exp_block_id.clone());
+        }
+        blocks.insert(exp_block_id.clone(), exp_block);
+
+        Input::block(&exp_block_id)
     }
 
     fn extract_constant_int(&self, expr: &Expression) -> Option<i64> {
