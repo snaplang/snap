@@ -163,6 +163,15 @@ pub enum Statement {
         index: Expression,
         value: Expression,
     },
+
+    /// Replace item in matrix: `matrix[x, y] = value`
+    /// Uses formula: x + y * width + 1 for row-major flattened storage
+    MatrixReplace {
+        matrix: String,
+        x: Expression,
+        y: Expression,
+        value: Expression,
+    },
 }
 
 /// Index for list operations
@@ -237,11 +246,12 @@ pub enum Expression {
         index: Box<Expression>,
     },
 
-    /// Matrix index access: `matrix[row][col]` (0-based, converted to 1-based for Scratch)
+    /// Matrix index access: `matrix[x, y]` (0-based, converted to 1-based for Scratch)
+    /// Uses formula: x + y * width + 1 for row-major flattened storage
     MatrixAccess {
         matrix: String,
-        row: Box<Expression>,
-        col: Box<Expression>,
+        x: Box<Expression>,
+        y: Box<Expression>,
     },
 
     /// List length: `list.length()`

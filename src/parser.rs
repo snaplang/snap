@@ -611,7 +611,25 @@ impl Parser {
     fn parse_list_index_assignment(&mut self, list_name: String) -> Result<Statement, String> {
         self.advance(); // consume identifier
         self.expect(TokenKind::LBracket)?;
-        let index = self.parse_expression()?;
+        let first_index = self.parse_expression()?;
+
+        // Check for comma (matrix assignment): matrix[x, y] = value
+        if self.check(&TokenKind::Comma) {
+            self.advance();
+            let second_index = self.parse_expression()?;
+            self.expect(TokenKind::RBracket)?;
+            self.expect(TokenKind::Equals)?;
+            let value = self.parse_expression()?;
+            self.expect(TokenKind::Semicolon)?;
+
+            return Ok(Statement::MatrixReplace {
+                matrix: list_name,
+                x: first_index,
+                y: second_index,
+                value,
+            });
+        }
+
         self.expect(TokenKind::RBracket)?;
         self.expect(TokenKind::Equals)?;
         let value = self.parse_expression()?;
@@ -619,7 +637,7 @@ impl Parser {
 
         Ok(Statement::ListReplace {
             list: list_name,
-            index,
+            index: first_index,
             value,
         })
     }
@@ -1187,29 +1205,29 @@ impl Parser {
         Ok(Expression::ListLiteral(items))
     }
 
-    /// Parse postfix expressions: index access (list[i]) and method calls (list.length())
+    /// Parse postfix expressions: index access (list[i] or matrix[x, y]) and method calls (list.length())
     fn parse_postfix_expr(&mut self, name: String) -> Result<Expression, String> {
-        // Check for index access: list[index]
+        // Check for index access: list[index] or matrix[x, y]
         if self.check(&TokenKind::LBracket) {
             self.advance();
-            let index = self.parse_expression()?;
-            self.expect(TokenKind::RBracket)?;
+            let first_index = self.parse_expression()?;
 
-            // Check for second index (matrix access): matrix[row][col]
-            if self.check(&TokenKind::LBracket) {
+            // Check for comma (matrix access): matrix[x, y]
+            if self.check(&TokenKind::Comma) {
                 self.advance();
-                let col = self.parse_expression()?;
+                let second_index = self.parse_expression()?;
                 self.expect(TokenKind::RBracket)?;
                 return Ok(Expression::MatrixAccess {
                     matrix: name,
-                    row: Box::new(index),
-                    col: Box::new(col),
+                    x: Box::new(first_index),
+                    y: Box::new(second_index),
                 });
             }
 
+            self.expect(TokenKind::RBracket)?;
             return Ok(Expression::IndexAccess {
                 list: name,
-                index: Box::new(index),
+                index: Box::new(first_index),
             });
         }
 

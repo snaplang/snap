@@ -46,14 +46,14 @@ on GreenFlag {
 
 ### Matrix Index Access
 
-Access matrix elements using double bracket notation:
+Access matrix elements using comma-separated indices `[x, y]`:
 
 ```snap
 let grid: matrix<int> = [[1, 2], [3, 4]];
 
 on GreenFlag {
-    // Access element at row 0, column 1
-    looks::Say(grid[0][1]);  // Says "2"
+    // Access element at x=1, y=0 (column 1, row 0)
+    looks::Say(grid[1, 0]);  // Says "2"
 }
 ```
 
@@ -207,15 +207,15 @@ new Sprite("Player") {
         let player_y: int = 1;
 
         on GreenFlag {
-            // Mark player position
-            game_grid[player_y][player_x] = 1;
+            // Mark player position using [x, y] syntax
+            game_grid[player_x, player_y] = 1;
         }
 
         on KeyPressed("right") {
             if player_x < 2 {
-                game_grid[player_y][player_x] = 0;
+                game_grid[player_x, player_y] = 0;
                 change player_x by 1;
-                game_grid[player_y][player_x] = 1;
+                game_grid[player_x, player_y] = 1;
             }
         }
     }
@@ -231,6 +231,7 @@ new Sprite("Player") {
 | `list.insert(index, item)`  | `insert [item] at [index] of [list]`         |
 | `list.replace(index, item)` | `replace item [index] of [list] with [item]` |
 | `list[index]`               | `item [index] of [list]`                     |
+| `matrix[x, y]`              | `item [x + y * width + 1] of [matrix]`       |
 | `list.length()`             | `length of [list]`                           |
 | `list.contains(item)`       | `[list] contains [item]?`                    |
 | `list.index_of(item)`       | `item # of [item] in [list]`                 |

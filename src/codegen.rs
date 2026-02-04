@@ -13,6 +13,8 @@ pub struct CodeGenerator {
     lists: HashMap<String, String>,
     /// Map of broadcast names to their IDs
     broadcasts: HashMap<String, String>,
+    /// Map of matrix names to their widths (number of columns)
+    matrix_widths: HashMap<String, usize>,
     /// Current Y position for placing top-level blocks
     current_y: f64,
 }
@@ -24,6 +26,7 @@ impl CodeGenerator {
             variables: HashMap::new(),
             lists: HashMap::new(),
             broadcasts: HashMap::new(),
+            matrix_widths: HashMap::new(),
             current_y: 0.0,
         }
     }
@@ -189,8 +192,25 @@ impl CodeGenerator {
     fn add_global_variables(&mut self, target: &mut Target, globals: &[GlobalVar]) {
         for global in globals {
             match &global.var_type {
-                VarType::List(_) | VarType::Matrix(_) => {
-                    // Handle list/matrix types
+                VarType::Matrix(_) => {
+                    // Handle matrix types - store width for indexing
+                    let list_id = self.get_or_create_list(&global.name);
+                    let initial_items = self.expr_to_list_items(&global.initial_value);
+
+                    // Extract matrix width from the literal
+                    if let Expression::MatrixLiteral(rows) = &global.initial_value {
+                        if let Some(first_row) = rows.first() {
+                            self.matrix_widths
+                                .insert(global.name.clone(), first_row.len());
+                        }
+                    }
+
+                    target
+                        .lists
+                        .insert(list_id, List::new(&global.name, initial_items));
+                }
+                VarType::List(_) => {
+                    // Handle list types
                     let list_id = self.get_or_create_list(&global.name);
                     let initial_items = self.expr_to_list_items(&global.initial_value);
                     target
@@ -756,6 +776,45 @@ impl CodeGenerator {
                 blocks.insert(block_id.clone(), block);
                 Some(block_id)
             }
+
+            Statement::MatrixReplace {
+                matrix,
+                x,
+                y,
+                value,
+            } => {
+                let block_id = self.generate_id();
+                let list_id = self.get_or_create_list(matrix);
+                let mut block = Block::new("data_replaceitemoflist");
+                block.parent = parent_id.map(|s| s.to_string());
+                block
+                    .fields
+                    .insert("LIST".to_string(), Field::new(matrix, Some(&list_id)));
+
+                // For matrix stored as flattened list, calculate: x + y * width + 1
+                let width = self.matrix_widths.get(matrix).copied().unwrap_or(1) as i64;
+                let index_expr = Expression::BinaryOp {
+                    left: Box::new(Expression::BinaryOp {
+                        left: Box::new(x.clone()),
+                        op: BinaryOperator::Add,
+                        right: Box::new(Expression::BinaryOp {
+                            left: Box::new(y.clone()),
+                            op: BinaryOperator::Mul,
+                            right: Box::new(Expression::IntLiteral(width)),
+                        }),
+                    }),
+                    op: BinaryOperator::Add,
+                    right: Box::new(Expression::IntLiteral(1)),
+                };
+                let index_input = self.generate_input(blocks, &index_expr, &block_id);
+                block.inputs.insert("INDEX".to_string(), index_input);
+
+                let value_input = self.generate_input(blocks, value, &block_id);
+                block.inputs.insert("ITEM".to_string(), value_input);
+
+                blocks.insert(block_id.clone(), block);
+                Some(block_id)
+            }
         }
     }
 
@@ -1179,12 +1238,8 @@ impl CodeGenerator {
                 Input::block(&block_id)
             }
 
-            Expression::MatrixAccess { matrix, row, col } => {
-                // For matrices stored as flattened lists, calculate: row * num_cols + col + 1
-                // Since we don't know num_cols at compile time, we'll need to store it
-                // For now, assume matrices are stored row-major and use a helper approach
-                // This generates: data_itemoflist with index = row * width + col + 1
-                // We'll use a simplified approach: treat as 1D list access
+            Expression::MatrixAccess { matrix, x, y } => {
+                // For matrices stored as flattened lists, calculate: x + y * width + 1
                 let block_id = self.generate_id();
                 let list_id = self.get_or_create_list(matrix);
                 let mut block = Block::new("data_itemoflist");
@@ -1193,16 +1248,17 @@ impl CodeGenerator {
                     .fields
                     .insert("LIST".to_string(), Field::new(matrix, Some(&list_id)));
 
-                // For matrix access, we need to calculate the linear index
-                // Assuming row-major order: index = row * num_cols + col
-                // Since we don't have num_cols, we'll create a compound expression
-                // For now, use a placeholder that assumes the user handles indexing
-                // A proper implementation would require storing matrix dimensions
+                // Calculate linear index: x + y * width + 1
+                let width = self.matrix_widths.get(matrix).copied().unwrap_or(1) as i64;
                 let index_expr = Expression::BinaryOp {
                     left: Box::new(Expression::BinaryOp {
-                        left: row.clone(),
+                        left: x.clone(),
                         op: BinaryOperator::Add,
-                        right: col.clone(),
+                        right: Box::new(Expression::BinaryOp {
+                            left: y.clone(),
+                            op: BinaryOperator::Mul,
+                            right: Box::new(Expression::IntLiteral(width)),
+                        }),
                     }),
                     op: BinaryOperator::Add,
                     right: Box::new(Expression::IntLiteral(1)),
