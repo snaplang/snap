@@ -1112,6 +1112,19 @@ impl Parser {
                                     unit: name,
                                     value: Box::new(rgba_sum),
                                 });
+                            } else if name == "Msec" {
+                                let value = self.parse_expression()?;
+                                self.expect(TokenKind::RParen)?;
+                                // Convert milliseconds to seconds: value / 1000
+                                let sec_value = Expression::BinaryOp {
+                                    left: Box::new(value),
+                                    op: BinaryOperator::Div,
+                                    right: Box::new(Expression::IntLiteral(1000)),
+                                };
+                                return Ok(Expression::UnitValue {
+                                    unit: name,
+                                    value: Box::new(sec_value),
+                                });
                             } else {
                                 // Regular unit with single argument
                                 let value = self.parse_expression()?;
