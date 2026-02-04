@@ -1483,6 +1483,7 @@ impl CodeGenerator {
             ("operators", "Join") => "operator_join",
             ("operators", "LetterOf") => "operator_letter_of",
             ("operators", "Length") => "operator_length",
+            ("operators", "Contains") => "operator_contains",
             ("operators", "Mod") => "operator_mod",
             ("operators", "Round") => "operator_round",
             ("operators", "MathOp") => "operator_mathop",
@@ -1569,6 +1570,18 @@ impl CodeGenerator {
                 if let Some(s) = call.args.first() {
                     let input = self.generate_input(blocks, s, block_id);
                     block.inputs.insert("STRING".to_string(), input);
+                }
+            }
+            ("operators", "Contains") => {
+                // First argument is the string to search in
+                if let Some(s1) = call.args.first() {
+                    let input = self.generate_input(blocks, s1, block_id);
+                    block.inputs.insert("STRING1".to_string(), input);
+                }
+                // Second argument is the string to search for
+                if let Some(s2) = call.args.get(1) {
+                    let input = self.generate_input(blocks, s2, block_id);
+                    block.inputs.insert("STRING2".to_string(), input);
                 }
             }
             ("operators", "Round") => {
