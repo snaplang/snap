@@ -222,7 +222,7 @@ mdbook serve
 | Custom functions      | Complete |
 | Imports               | Complete |
 | Pen extension         | Complete |
-| Lists                 | Planned  |
+| Lists                 | Complete |
 | Custom costumes       | Planned  |
 | Custom sounds         | Planned  |
 
